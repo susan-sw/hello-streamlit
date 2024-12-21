@@ -12,73 +12,79 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
-
-import numpy as np
-
+import pandas as pd
+import matplotlib.pyplot as plt
 import streamlit as st
 from streamlit.hello.utils import show_code
 
 
-def animation_demo() -> None:
+def issue_analysis_demo() -> None:
+    # Load data
+    file_path = '../data/MON_WEEK.csv'
+    data = pd.read_csv(file_path)
 
-    # Interactive Streamlit elements, like these sliders, return their value.
-    # This gives you an extremely simple interaction model.
-    iterations = st.sidebar.slider("Level of detail", 2, 20, 10, 1)
-    separation = st.sidebar.slider("Separation", 0.7, 2.0, 0.7885)
+    # Clean and preprocess data
+    data.columns = ["Issue key", "Summary", "Priority","Custom field (Bundle Version)", "Custom field (Linked LSTI/DVTI)"]
+    data.rename(columns={"Issue key":"MON.ID",
+                         "Summary":"MON.summary",
+                         "Priority":"MON.priority",
+                         "Custom field (Bundle Version)":"bundle",
+                         "Custom field (Linked LSTI/DVTI)":"LSTI.ID"})
+    data["Priority"] = data["Priority"].str.strip()  # Remove extra spaces
+    data["Linked LSTI"] = data["Linked LSTI"].fillna("Unlinked")  # Fill NaN values
 
-    # Non-interactive elements return a placeholder to their location
-    # in the app. Here we're storing progress_bar to update it later.
-    progress_bar = st.sidebar.progress(0)
+    # Set page title and sidebar
+    st.title("Moment Analysis Dashboard")
+    st.sidebar.header("Analysis Options")
+    option = st.sidebar.selectbox("Select Analysis Type", ["MON Priority Distribution", "Linked LSTI Distribution"])
 
-    # These two elements will be filled in later, so we create a placeholder
-    # for them using st.empty()
-    frame_text = st.sidebar.empty()
-    image = st.empty()
+    if option == "Priority Distribution":
+        st.header("Priority Distribution")
 
-    m, n, s = 960, 640, 400
-    x = np.linspace(-m / s, m / s, num=m).reshape((1, m))
-    y = np.linspace(-n / s, n / s, num=n).reshape((n, 1))
+        # Group by priority and count
+        priority_counts = data["MON.priority"].value_counts()
 
-    for frame_num, a in enumerate(np.linspace(0.0, 4 * np.pi, 100)):
-        # Here were setting value for these two elements.
-        progress_bar.progress(frame_num)
-        frame_text.text("Frame %i/100" % (frame_num + 1))
+        # Plot pie chart
+        fig, ax = plt.subplots()
+        ax.pie(priority_counts, labels=priority_counts.index, autopct="%.1f%%", startangle=90,
+               colors=plt.cm.Pastel1.colors)
+        ax.set_title("Priority Distribution")
+        st.pyplot(fig)
 
-        # Performing some fractal wizardry.
-        c = separation * np.exp(1j * a)
-        Z = np.tile(x, (n, 1)) + 1j * np.tile(y, (1, m))
-        C = np.full((n, m), c)
-        M: Any = np.full((n, m), True, dtype=bool)
-        N = np.zeros((n, m))
+        # Show details for selected priority
+        selected_priority = st.selectbox("Select Priority to View Details", priority_counts.index)
+        filtered_data = data[data["Priority"] == selected_priority]
+        st.write(filtered_data)
 
-        for i in range(iterations):
-            Z[M] = Z[M] * Z[M] + C[M]
-            M[np.abs(Z) > 2] = False
-            N[M] = i
+    elif option == "Linked LSTI Distribution":
+        st.header("Linked LSTI Distribution")
 
-        # Update the image placeholder by calling the image() function on it.
-        image.image(1.0 - (N / N.max()), use_column_width=True)
+        # Group by LSTI and count
+        lsti_counts = data["LSTI.ID"].value_counts()
 
-    # We clear elements by calling empty on them.
-    progress_bar.empty()
-    frame_text.empty()
+        # Plot bar chart
+        fig, ax = plt.subplots()
+        ax.bar(lsti_counts.index, lsti_counts.values, color=plt.cm.Pastel1.colors)
+        ax.set_title("Linked LSTI Distribution")
+        ax.set_xlabel("LSTI")
+        ax.set_ylabel("Count")
+        plt.xticks(rotation=45, ha="right")
+        st.pyplot(fig)
 
-    # Streamlit widgets automatically run the script from top to bottom. Since
-    # this button is not connected to any other logic, it just causes a plain
-    # rerun.
-    st.button("Re-run")
+        # Show details for selected LSTI
+        selected_lsti = st.selectbox("Select Linked LSTI to View Details", lsti_counts.index)
+        filtered_data = data[data["LSTI"] == selected_lsti]
+        st.write(filtered_data)
 
 
-st.set_page_config(page_title="Animation Demo", page_icon="📹")
-st.markdown("# Animation Demo")
-st.sidebar.header("Animation Demo")
+st.set_page_config(page_title="Issue Analysis Demo", page_icon="📊")
+st.markdown("# Issue Analysis Demo")
+st.sidebar.header("Issue Analysis")
 st.write(
-    """This app shows how you can use Streamlit to build cool animations.
-It displays an animated fractal based on the the Julia Set. Use the slider
-to tune different parameters."""
+    """This app provides a dashboard for analyzing issue data.
+It displays distributions by priority and linked LSTI with interactive details."""
 )
 
-animation_demo()
+issue_analysis_demo()
 
-show_code(animation_demo)
+show_code(issue_analysis_demo)
